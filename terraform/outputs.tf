@@ -55,6 +55,11 @@ output "studio_execution_role_arn" {
   value       = var.deployment_mode == "studio" ? module.studio[0].studio_execution_role_arn : null
 }
 
+output "custom_sagemaker_execution_role_arn" {
+  description = "SageMaker Execution Role ARN (Custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].sagemaker_execution_role_arn : null
+}
+
 # Custom-specific outputs
 output "mlflow_server_public_ip" {
   description = "Public IP address of the MLflow server (custom mode only)"
@@ -130,6 +135,7 @@ output "connection_info" {
     mlflow_ui_url = var.deployment_mode == "custom" ? module.custom[0].mlflow_ui_url : null
     ssh_connection = var.deployment_mode == "custom" && var.key_pair_name != "" ? "ssh -i ${var.key_pair_name}.pem ec2-user@${module.custom[0].mlflow_server_public_ip}" : "Key pair not specified"
     database_endpoint = var.deployment_mode == "custom" ? module.custom[0].rds_endpoint : null
+    sagemaker_execution_role_arn = var.deployment_mode == "custom" ? module.custom[0].sagemaker_execution_role_arn : null
     artifact_store = "s3://${aws_s3_bucket.mlflow_bucket.bucket}/mlflow-artifacts"
     access_instructions = "Open ${module.custom[0].mlflow_ui_url} in your browser"
     } : {

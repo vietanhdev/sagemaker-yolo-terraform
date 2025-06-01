@@ -23,6 +23,9 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+# Get current AWS caller identity
+data "aws_caller_identity" "current" {}
+
 # Generate private key for the key pair
 resource "tls_private_key" "mlflow_key" {
   algorithm = "RSA"
@@ -315,4 +318,88 @@ resource "aws_cloudwatch_log_group" "mlflow_logs" {
     Environment = "dev"
     Project = var.project_name
   }
+}
+
+# SageMaker Execution Role for Custom Setup
+resource "aws_iam_role" "sagemaker_execution_role" {
+  name = "${var.project_name}-sagemaker-execution-role-${var.bucket_suffix}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "sagemaker.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-sagemaker-execution-role"
+    Environment = "dev"
+    Project = var.project_name
+  }
+}
+
+# Comprehensive SageMaker policy for custom setup
+resource "aws_iam_role_policy" "sagemaker_comprehensive_policy" {
+  name = "${var.project_name}-sagemaker-comprehensive-policy"
+  role = aws_iam_role.sagemaker_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:CreateBucket"
+        ]
+        Resource = [
+          var.mlflow_bucket_arn,
+          "${var.mlflow_bucket_arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sagemaker:*",
+          "ecr:*",
+          "logs:*",
+          "cloudwatch:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-*"
+      }
+    ]
+  })
+}
+
+# Attach managed policies for SageMaker
+resource "aws_iam_role_policy_attachment" "sagemaker_execution_policy" {
+  role       = aws_iam_role.sagemaker_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "sagemaker_s3_policy" {
+  role       = aws_iam_role.sagemaker_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "sagemaker_ecr_policy" {
+  role       = aws_iam_role.sagemaker_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
 } 

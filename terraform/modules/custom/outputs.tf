@@ -71,4 +71,9 @@ output "ec2_security_group_id" {
 output "rds_security_group_id" {
   description = "Security Group ID for RDS instance"
   value       = aws_security_group.rds_sg.id
+}
+
+output "sagemaker_execution_role_arn" {
+  description = "SageMaker Execution Role ARN for training jobs"
+  value       = aws_iam_role.sagemaker_execution_role.arn
 } 
