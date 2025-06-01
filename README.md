@@ -184,7 +184,7 @@ cp terraform-custom.tfvars.example terraform.tfvars
 # 3. Deploy
 terraform init
 terraform plan    # Review infrastructure
-terraform apply   # Deploy (8-12 minutes)
+terraform apply   # Deploy
 
 # 4. Access MLflow
 # Open the MLflow UI URL from terraform outputs
@@ -195,7 +195,7 @@ terraform apply   # Deploy (8-12 minutes)
 | Feature | Studio Mode | Custom Mode |
 |---------|-------------|----------|
 | **Management** | Fully managed | Self-managed |
-| **Setup Time** | 30-40 minutes* | 8-12 minutes |
+| **Setup Time** | 30-40 minutes* | 20-30 minutes |
 | **Monthly Cost** | $80-150 | $50-100 |
 | **IDE Access** | Built-in browser IDE | External tools |
 | **Team Collaboration** | Native Studio features | Via MLflow UI only |
