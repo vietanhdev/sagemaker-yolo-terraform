@@ -12,7 +12,11 @@ estimator = PyTorch(
     entry_point="yolo_training.py",
     source_dir="./scripts",  # Path to your training scripts
     role=role_arn,
-    instance_type="ml.g4dn.xlarge",
+    instance_type="ml.g4dn.xlarge",  # GPU instance - trying on-demand instead of spot
+    # Alternative instance types if quota issues persist:
+    # instance_type="ml.g5.xlarge",    # Newer GPU, 24GB VRAM
+    # instance_type="ml.g4dn.2xlarge", # Larger GPU, 32GB VRAM  
+    # instance_type="ml.m5.large",     # CPU fallback option
     instance_count=1,
     framework_version="2.0",
     py_version="py310",
@@ -25,19 +29,22 @@ estimator = PyTorch(
         's3-bucket': 'yolo-mlflow-artifacts-7zj6tv75',
         's3-dataset-key': 'datasets/beverages/',
         'model-size': 'yolo11s',
-        'epochs': 50,
+        'epochs': 25,
         'batch-size': 16,
         'imgsz': 640,
-        'experiment-name': 'custom-yolo-training'
+        'experiment-name': 'custom-yolo-gpu-training'
     },
-    max_run=24*60*60,  # 24 hours timeout
-    use_spot_instances=True,  # 90% cost savings
-    max_wait=24*60*60
+    max_run=4*60*60,  # 4 hours timeout
+    use_spot_instances=True 
 )
 
 print("🚀 Starting SageMaker training job...")
 print(f"   Using role: {role_arn}")
+print(f"   Instance type: ml.g4dn.xlarge (GPU)")
+print(f"   Model: yolo11s (standard - GPU training)")
+print(f"   Epochs: 25 (moderate GPU training)")
 print(f"   MLflow URI: http://107.21.1.121:5000")
 print(f"   Training data: s3://yolo-mlflow-artifacts-7zj6tv75/datasets/beverages/")
+print("   Note: Using on-demand GPU instance instead of spot to avoid quota limits.")
 
 estimator.fit("s3://yolo-mlflow-artifacts-7zj6tv75/datasets/beverages/")
