@@ -1,5 +1,7 @@
 # 🚀 MLflow YOLO Platform - Dual Deployment Architecture
 
+**NOTE:** This is a WORK-IN-PROCESS.
+
 > **Deploy enterprise-grade ML infrastructure with two flexible deployment options**
 
 A comprehensive Terraform platform for YOLO model training and experiment tracking, offering both **SageMaker Studio** and **Custom EC2-based** deployment options.

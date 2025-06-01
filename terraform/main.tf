@@ -37,7 +37,8 @@ resource "random_string" "bucket_suffix" {
 
 # S3 Bucket for MLflow artifacts and YOLO datasets
 resource "aws_s3_bucket" "mlflow_bucket" {
-  bucket = "${var.project_name}-artifacts-${random_string.bucket_suffix.result}"
+  bucket        = "${var.project_name}-artifacts-${random_string.bucket_suffix.result}"
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name}-artifacts"

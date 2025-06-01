@@ -48,42 +48,30 @@ get_deployment_info() {
         exit 0
     fi
     
-    DEPLOYMENT_MODE=$(terraform output -raw deployment_mode 2>/dev/null || echo "unknown")
-    PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "yolo-mlflow")
-    AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "us-east-1")
-    BUCKET_NAME=$(terraform output -raw mlflow_bucket_name 2>/dev/null || echo "")
+    DEPLOYMENT_MODE=$(terraform output -raw deployment_mode 2>/dev/null | grep -v "Warning\|╷\|│\|╵" | head -1 || echo "unknown")
+    PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null | grep -v "Warning\|╷\|│\|╵" | head -1 || echo "yolo-mlflow")
     
-    print_status "Mode: $DEPLOYMENT_MODE | Region: $AWS_REGION | Bucket: $BUCKET_NAME"
+    # Get AWS region or use default
+    AWS_REGION_RAW=$(terraform output -raw aws_region 2>/dev/null | grep -v "Warning\|╷\|│\|╵" | head -1)
+    if [ -z "$AWS_REGION_RAW" ] || [[ "$AWS_REGION_RAW" =~ ^[[:space:]]*$ ]]; then
+        AWS_REGION="us-east-1"
+    else
+        AWS_REGION="$AWS_REGION_RAW"
+    fi
+    
+    print_status "Mode: $DEPLOYMENT_MODE | Region: $AWS_REGION"
     cd ..
-}
-
-# Fast S3 cleanup
-cleanup_s3() {
-    if [ -z "$BUCKET_NAME" ]; then
-        return 0
-    fi
-    
-    print_status "Cleaning S3 bucket: $BUCKET_NAME"
-    
-    if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" --no-cli-pager 2>/dev/null; then
-        # Try fast removal first
-        if aws s3 rb "s3://$BUCKET_NAME" --force --region "$AWS_REGION" --no-cli-pager 2>/dev/null; then
-            print_success "S3 bucket removed"
-        else
-            # Fallback: empty then let terraform destroy
-            aws s3 rm "s3://$BUCKET_NAME" --recursive --region "$AWS_REGION" --no-cli-pager || true
-            print_success "S3 bucket emptied"
-        fi
-    fi
 }
 
 # Stop running resources
 stop_resources() {
     print_status "Stopping running resources..."
     
-    # Stop SageMaker apps
+    cd terraform
+    
+    # Stop SageMaker Studio apps
     if [ "$DEPLOYMENT_MODE" = "studio" ]; then
-        STUDIO_DOMAIN_ID=$(terraform output -raw studio_domain_id 2>/dev/null || echo "")
+        STUDIO_DOMAIN_ID=$(terraform output -raw studio_domain_id 2>/dev/null | grep -v "Warning\|╷\|│\|╵" | head -1 || echo "")
         if [ ! -z "$STUDIO_DOMAIN_ID" ]; then
             aws sagemaker list-apps --domain-id-equals "$STUDIO_DOMAIN_ID" --region "$AWS_REGION" \
                 --query 'Apps[?Status==`InService`].[DomainId,UserProfileName,AppType,AppName]' \
@@ -98,7 +86,7 @@ stop_resources() {
     
     # Stop EC2 instances
     if [ "$DEPLOYMENT_MODE" = "custom" ]; then
-        EC2_INSTANCE_ID=$(terraform output -raw mlflow_server_instance_id 2>/dev/null || echo "")
+        EC2_INSTANCE_ID=$(terraform output -raw mlflow_server_instance_id 2>/dev/null | grep -v "Warning\|╷\|│\|╵" | head -1 || echo "")
         if [ ! -z "$EC2_INSTANCE_ID" ]; then
             aws ec2 stop-instances --instance-ids "$EC2_INSTANCE_ID" --region "$AWS_REGION" --no-cli-pager || true
         fi
@@ -112,6 +100,8 @@ stop_resources() {
             aws sagemaker stop-training-job --training-job-name "$job_name" --region "$AWS_REGION" --no-cli-pager || true
         fi
     done
+    
+    cd ..
 }
 
 # Destroy infrastructure
@@ -164,7 +154,6 @@ main() {
     fi
     
     get_deployment_info
-    cleanup_s3
     stop_resources
     destroy_all
     cleanup_local
