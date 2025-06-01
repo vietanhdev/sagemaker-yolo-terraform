@@ -1,4 +1,4 @@
-# 🚀 MLflow YOLO Platform - Dual Deployment Architecture
+# 🚀 SageMaker MLflow YOLO Platform - Dual Deployment Architecture
 
 **NOTE:** This is a WORK-IN-PROCESS.
 
@@ -152,42 +152,14 @@ graph TB
 
 ### **Studio Deployment (Recommended)**
 ```bash
-# 1. Clone and navigate
-git clone <your-repo>
-cd terraform-sagemaker-yolo/terraform
-
-# 2. Configure for Studio
+# Configure for Studio
 cp terraform-studio.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your settings
 
-# 3. Deploy
-terraform init
-terraform plan    # Review infrastructure
-terraform apply   # Deploy (5-8 minutes)
+bash scripts/deploy.sh
 
-# 4. Access Studio
+# Access Studio
 # Go to AWS Console → SageMaker → Studio → Launch Studio
-```
-
-### **Custom Deployment**
-```bash
-# ⚠️  IMPORTANT: Key pair is REQUIRED for Custom mode
-# Create AWS Key Pair FIRST (before terraform apply)
-aws ec2 create-key-pair --key-name my-mlflow-key \
-    --query 'KeyMaterial' --output text > my-mlflow-key.pem
-chmod 400 my-mlflow-key.pem
-
-# 2. Configure for Custom deployment
-cp terraform-custom.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set key_pair_name = "my-mlflow-key"
-
-# 3. Deploy
-terraform init
-terraform plan    # Review infrastructure
-terraform apply   # Deploy
-
-# 4. Access MLflow
-# Open the MLflow UI URL from terraform outputs
 ```
 
 ## 📊 **Deployment Comparison**
@@ -231,72 +203,6 @@ db_instance_class = "db.t3.micro"
 db_allocated_storage = 20
 ```
 
-## 🚀 **Using the Platform**
-
-### **Studio Mode Workflow**
-```python
-# In SageMaker Studio notebook
-import mlflow
-import mlflow.pytorch
-
-# MLflow is automatically configured
-mlflow.set_experiment("yolo-v11-experiment")
-
-with mlflow.start_run():
-    # Your YOLO training code
-    model = train_yolo_model(data_path="s3://bucket/dataset/")
-    
-    # Log metrics and artifacts
-    mlflow.log_metric("map50", 0.85)
-    mlflow.pytorch.log_model(model, "yolo-model")
-```
-
-### **Custom Mode Workflow**
-```python
-# Local development or remote training
-import mlflow
-import mlflow.pytorch
-
-# Set tracking URI to your Custom EC2 MLflow server
-mlflow.set_tracking_uri("http://YOUR_EC2_IP:5000")
-mlflow.set_experiment("yolo-v11-experiment")
-
-with mlflow.start_run():
-    # Your YOLO training code
-    model = train_yolo_model(data_path="s3://bucket/dataset/")
-    
-    # Log metrics and artifacts
-    mlflow.log_metric("map50", 0.85)
-    mlflow.pytorch.log_model(model, "yolo-model")
-```
-
-### **SageMaker Training Integration**
-```python
-# Works with both deployment modes
-from sagemaker.pytorch import PyTorch
-
-# Get the appropriate role from terraform outputs
-# For Studio mode:
-# role_arn = "arn:aws:iam::123456789012:role/your-studio-execution-role"  # From: terraform output studio_execution_role_arn
-# For Custom mode:
-# role_arn = "arn:aws:iam::123456789012:role/your-sagemaker-execution-role"  # From: terraform output custom_sagemaker_execution_role_arn
-role_arn = "arn:aws:iam::123456789012:role/your-sagemaker-execution-role"  # From terraform output custom_sagemaker_execution_role_arn
-
-estimator = PyTorch(
-    entry_point="train.py",
-    role=role_arn,
-    instance_type="ml.g4dn.xlarge",
-    framework_version="2.0",
-    environment={
-        "MLFLOW_TRACKING_URI": "YOUR_MLFLOW_SERVER_URL"
-    }
-)
-
-estimator.fit("s3://your-bucket/datasets/")
-```
-
-## 📈 **Datasets & Training**
-
 ### **Quick Start Datasets**
 ```bash
 cd data
@@ -331,143 +237,81 @@ datasets/
 
 ## 🚀 **YOLO Training Instructions**
 
-> **After uploading your dataset to S3, follow these instructions to start training**
+> **Simple 2-step process: Edit config and run training script**
 
 ### **Prerequisites**
 ```bash
 cd terraform
 
-# 1. Get your MLflow URI from terraform outputs
+# Get your infrastructure details
 terraform output mlflow_tracking_uri
-
-# 2. Get your S3 bucket name 
 terraform output s3_bucket_name
-
-# 3. Ensure your dataset is uploaded to S3 with proper structure
 ```
 
-### **Studio Mode Training (Recommended)**
+### **Step 1: Configure Training**
 
-#### **Option 1: SageMaker Studio Notebook**
-```python
-# In a SageMaker Studio notebook cell
-import subprocess
-import os
+Edit the appropriate config file based on your deployment:
 
-# Configuration from terraform outputs
-MLFLOW_URI = "https://mlflow-tracking-123456789.us-east-1.sagemaker.aws/"  # From terraform output
-S3_BUCKET = "your-terraform-bucket-name"  # From terraform output
-DATASET_KEY = "datasets/beverages/"
+**For Studio Mode:** `configs/studio_training_config.yaml`
+```yaml
+# Studio SageMaker Training Configuration
+mlflow_uri: "https://mlflow-tracking-123456789.us-east-1.sagemaker.aws/"  # From terraform output
+s3_bucket: "your-terraform-bucket-name"  # From terraform output
+dataset_key: "datasets/beverages/"  # Your dataset path in S3
 
-# Run YOLO training
-cmd = [
-    'python', '/opt/ml/code/scripts/yolo_training.py',
-    '--mlflow-uri', MLFLOW_URI,
-    '--data-path', f's3://{S3_BUCKET}/{DATASET_KEY}data.yaml',
-    '--s3-bucket', S3_BUCKET,
-    '--s3-dataset-key', DATASET_KEY,
-    '--model-size', 'yolo11s',  # Options: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
-    '--epochs', '50',
-    '--batch-size', '16',
-    '--imgsz', '640',
-    '--experiment-name', 'beverage-detection-v1'
-]
+# Training Parameters
+model_size: "yolo11s"  # Options: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
+epochs: 50
+batch_size: 16
+image_size: 640
+experiment_name: "beverage-detection-v1"
 
-# Execute training
-result = subprocess.run(cmd, capture_output=True, text=True)
-print("Training Output:", result.stdout)
-if result.stderr:
-    print("Errors:", result.stderr)
+# SageMaker Configuration
+instance_type: "ml.g4dn.xlarge"
+use_spot_instances: true  # 90% cost savings
+max_run_hours: 24
 ```
 
-#### **Option 2: SageMaker Training Job (Production)**
-```python
-import boto3
-from sagemaker.pytorch import PyTorch
-from sagemaker import get_execution_role
+**For Custom Mode:** `configs/custom_training_config.yaml`
+```yaml
+# Custom EC2 Training Configuration
+mlflow_uri: "http://YOUR_EC2_IP:5000"  # From terraform output ec2_public_ip
+s3_bucket: "your-terraform-bucket-name"  # From terraform output
+dataset_key: "datasets/beverages/"  # Your dataset path in S3
 
-# Get IAM role from terraform outputs
-role_arn = "arn:aws:iam::123456789012:role/your-sagemaker-execution-role"  # From terraform output custom_sagemaker_execution_role_arn
+# Training Parameters
+model_size: "yolo11s"  # Options: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
+epochs: 50
+batch_size: 16
+image_size: 640
+experiment_name: "beverage-detection-v1"
 
-# Configure training job
-estimator = PyTorch(
-    entry_point='yolo_training.py',
-    source_dir='./scripts',
-    role=role_arn,
-    instance_type='ml.g4dn.xlarge',  # GPU instance for faster training
-    instance_count=1,
-    framework_version='2.0',
-    py_version='py310',
-    environment={
-        'MLFLOW_TRACKING_URI': 'YOUR_MLFLOW_URI'
-    },
-    hyperparameters={
-        'mlflow-uri': 'YOUR_MLFLOW_URI',
-        'data-path': 's3://your-bucket/datasets/beverages/data.yaml',
-        's3-bucket': 'your-bucket',
-        's3-dataset-key': 'datasets/beverages/',
-        'model-size': 'yolo11s',
-        'epochs': 100,
-        'batch-size': 16,
-        'imgsz': 640,
-        'experiment-name': 'yolo-production-training'
-    },
-    max_run=24*60*60,  # 24 hours timeout
-    use_spot_instances=True,  # 90% cost savings
-    max_wait=24*60*60
-)
-
-# Start training
-estimator.fit({
-    'training': 's3://your-bucket/datasets/beverages/'
-})
+# SageMaker Configuration
+instance_type: "ml.g4dn.xlarge"
+use_spot_instances: true  # 90% cost savings
+max_run_hours: 24
 ```
 
-### **Custom Mode Training**
+### **Step 2: Run Training**
 
-#### **Option 1: Direct Script Execution**
+**For Studio Mode:**
 ```bash
-# SSH into your EC2 MLflow server
-terraform output ec2_public_ip
-ssh -i your-key.pem ubuntu@EC2_PUBLIC_IP
-
-# Install dependencies (if not already installed)
-sudo apt update
-sudo apt install python3-pip -y
-pip3 install ultralytics mlflow boto3 torch torchvision
-
-# Run training directly on EC2
-python3 /path/to/yolo_training.py \
-    --mlflow-uri http://localhost:5000 \
-    --data-path s3://your-bucket/datasets/beverages/data.yaml \
-    --s3-bucket your-bucket \
-    --s3-dataset-key datasets/beverages/ \
-    --model-size yolo11s \
-    --epochs 50 \
-    --batch-size 16 \
-    --experiment-name beverage-detection
+python examples/studio_sagemaker_training.py
 ```
 
-#### **Option 2: SageMaker Training Job with Custom MLflow**
-```python
-# Same as Studio mode but use Custom EC2 MLflow URI
-estimator = PyTorch(
-    # ... same configuration ...
-    environment={
-        'MLFLOW_TRACKING_URI': 'http://YOUR_EC2_IP:5000'  # Custom MLflow server
-    }
-)
+**For Custom Mode:**
+```bash
+python examples/custom_sagemaker_training.py
 ```
 
 ### **Training Parameters Guide**
 
 | Parameter | Description | Recommended Values |
 |-----------|-------------|-------------------|
-| `--model-size` | YOLO model variant | `yolo11n` (fast), `yolo11s` (balanced), `yolo11m` (accurate) |
-| `--epochs` | Training iterations | 50-100 (start with 50) |
-| `--batch-size` | Batch size | 16 (adjust based on GPU memory) |
-| `--imgsz` | Input image size | 640 (standard), 1024 (high-res) |
-| `--device` | Training device | `auto` (recommended), `0` (GPU 0), `cpu` |
+| `model_size` | YOLO model variant | `yolo11n` (fast), `yolo11s` (balanced), `yolo11m` (accurate) |
+| `epochs` | Training iterations | 50-100 (start with 50) |
+| `batch_size` | Batch size | 16 (adjust based on GPU memory) |
+| `image_size` | Input image size | 640 (standard), 1024 (high-res) |
 
 ### **Instance Type Recommendations**
 
@@ -514,79 +358,6 @@ After training completes, you'll find:
 └── 📈 Experiment data
 ```
 
-### **Post-Training Steps**
-
-```python
-# 1. Download trained model
-import mlflow
-import mlflow.pytorch
-
-# Set tracking URI
-mlflow.set_tracking_uri("YOUR_MLFLOW_URI")
-
-# Get the best model from latest run
-experiment = mlflow.get_experiment_by_name("beverage-detection-v1")
-runs = mlflow.search_runs(experiment_ids=[experiment.experiment_id])
-best_run_id = runs.loc[runs['metrics.final_map'].idxmax(), 'run_id']
-
-# Download model
-model_uri = f"runs:/{best_run_id}/model"
-model = mlflow.pytorch.load_model(model_uri)
-
-# 2. Run inference
-from ultralytics import YOLO
-model = YOLO(f"runs/{best_run_id}/model/best.pt")
-results = model("path/to/test/image.jpg")
-```
-
-### **Troubleshooting Training Issues**
-
-#### **Out of Memory Errors**
-```bash
-# Reduce batch size
---batch-size 8  # or 4 for smaller GPUs
-
-# Use smaller model
---model-size yolo11n  # instead of yolo11s/m/l
-```
-
-#### **S3 Access Issues**
-```bash
-# Verify S3 permissions
-aws s3 ls s3://your-bucket/datasets/
-aws iam get-role --role-name your-sagemaker-role
-```
-
-#### **MLflow Connection Issues**
-```bash
-# Test MLflow connectivity
-curl -X GET YOUR_MLFLOW_URI/health
-
-# For Custom mode, check EC2 security groups
-terraform output security_group_mlflow
-```
-
-## 🔒 **Security Features**
-
-### **Built-in Security**
-- ✅ **S3 Encryption**: AES-256 server-side encryption
-- ✅ **Access Control**: IAM roles with least-privilege
-- ✅ **Network Security**: Security groups and VPC isolation
-- ✅ **Credential Management**: Secrets Manager integration
-- ✅ **Audit Logging**: CloudTrail and CloudWatch integration
-
-### **Studio Mode Security**
-- AWS managed security policies
-- IAM-based authentication
-- VPC isolation capabilities
-- Enterprise compliance ready
-
-### **Custom Mode Security**
-- Private database subnets
-- Encrypted credential storage
-- SSH key-based access
-- Configurable security groups
-
 ## 💰 **Cost Optimization**
 
 ### **Studio Mode Costs**
@@ -632,77 +403,8 @@ Monthly Estimate (us-east-1):
 ## 🧹 **Cleanup**
 
 ```bash
-# Destroy all infrastructure
-terraform destroy
-
-# Confirm deletion of S3 objects if needed
-aws s3 rm s3://your-bucket-name --recursive
+bash scripts/cleanup.sh
 ```
-
-## 🛠️ **Troubleshooting**
-
-### **Common Issues**
-
-#### **Custom Mode: Missing Key Pair Error**
-```
-❌ Custom deployment mode requires key_pair_name to be set in terraform.tfvars
-```
-
-**Solution:**
-```bash
-# 1. Create the key pair
-aws ec2 create-key-pair --key-name my-key \
-    --query 'KeyMaterial' --output text > my-key.pem
-chmod 600 my-key.pem
-
-# 2. Update terraform.tfvars
-# Set: key_pair_name = "my-key"
-
-# 3. Apply terraform
-terraform apply
-```
-
-#### **Studio Mode: MLflow Server Setup Takes 25+ Minutes**
-This is normal behavior. The SageMaker MLflow tracking server requires initial setup time.
-
-**Monitoring Progress:**
-```bash
-# Check CloudFormation stack status
-aws cloudformation describe-stacks \
-    --stack-name sagemaker-mlflow-* \
-    --query 'Stacks[0].StackStatus'
-```
-
-#### **S3 Access Denied Errors**
-**Solution:** Verify IAM roles have proper S3 permissions:
-```bash
-# Check IAM role policies
-aws iam list-attached-role-policies --role-name YourRoleName
-```
-
-#### **RDS Connection Issues (Custom Mode)**
-**Solution:** Check security groups and VPC configuration:
-```bash
-# Test database connectivity from EC2
-terraform output rds_endpoint
-# SSH into EC2 and test: mysql -h <endpoint> -u <username> -p
-```
-
-#### **Terraform State Lock Issues**
-**Solution:**
-```bash
-# Force unlock (use with caution)
-terraform force-unlock <lock-id>
-
-# Or check for existing terraform processes
-ps aux | grep terraform
-```
-
-### **Getting Help**
-- 📋 Check CloudWatch logs for detailed error messages
-- 🔍 Use `terraform plan` to preview changes before applying
-- 📞 AWS Support for service-specific issues
-- 📖 Terraform documentation for configuration problems
 
 ## 🔄 **Migration & Upgrades**
 
@@ -711,54 +413,9 @@ ps aux | grep terraform
 # Change deployment_mode in terraform.tfvars
 deployment_mode = "custom"  # Switch from "studio" to "custom"
 
-# Apply changes (S3 bucket and data preserved)
-terraform plan
-terraform apply
+# Apply changes
+bash scripts/deploy.sh
 ```
-
-### **Zero-Downtime Upgrade Path**
-- S3 artifacts remain accessible during migration
-- MLflow data can be exported/imported
-- Gradual migration strategies supported
-
-## 🛠️ **Advanced Configuration**
-
-### **Custom VPC Deployment**
-Both modules can be modified to use custom VPCs for enhanced network control.
-
-### **High Availability Setup**
-- Multi-AZ RDS deployment
-- Application Load Balancer integration
-- Auto Scaling Groups for Custom mode
-
-### **CI/CD Integration**
-```yaml
-# Example GitHub Actions workflow
-name: MLflow Training Pipeline
-on: [push]
-jobs:
-  train:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Deploy Infrastructure
-        run: |
-          terraform init
-          terraform apply -auto-approve
-      - name: Run Training
-        run: python train.py
-```
-
-## 📚 **Documentation**
-
-- 📖 [Detailed Setup Guide](terraform/README.md)
-- 🎯 [YOLO Training Examples](docs/training-examples.md)
-- 🔧 [Troubleshooting Guide](docs/troubleshooting.md)
-- 🏗️ [Architecture Deep Dive](docs/architecture.md)
-
-## 🤝 **Contributing**
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## 📄 **License**
 
@@ -766,7 +423,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🌟 **Why Choose This Platform?**
+## 🌟 **Why Choose This Repository?**
 
 ✅ **Flexibility**: Two deployment options for different team needs  
 ✅ **Enterprise Ready**: Security, compliance, and scalability built-in  
