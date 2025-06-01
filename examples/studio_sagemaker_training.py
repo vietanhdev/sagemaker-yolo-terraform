@@ -13,7 +13,7 @@ def main():
     """Main training function for Studio mode."""
     try:
         # Use the shared training function with studio configuration
-        estimator = run_training(
+        run_training(
             config_file="config_studio.yaml",
             deployment_mode="studio",
             script_name="studio"

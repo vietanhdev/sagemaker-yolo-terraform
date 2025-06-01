@@ -1,6 +1,7 @@
 # Core ML packages
 ultralytics>=8.3.0  # YOLO11 support
-mlflow>=2.8.0
+mlflow==2.13.2
+sagemaker-mlflow==0.1.0 
 torch>=2.0.0
 torchvision>=0.15.0
 

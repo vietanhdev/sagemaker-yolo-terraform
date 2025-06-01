@@ -59,14 +59,14 @@ def build_training_parameters_studio(config, deployment_info):
     # Get values from deployment_info or config overrides
     s3_bucket = config['overrides']['s3_bucket'] or deployment_info.get('S3_BUCKET')
     execution_role = config['overrides']['execution_role'] or deployment_info.get('STUDIO_EXECUTION_ROLE')
-    mlflow_uri = config['overrides']['mlflow_uri'] or deployment_info.get('STUDIO_MLFLOW_URL')
+    mlflow_uri = config['overrides']['mlflow_uri'] or deployment_info.get('STUDIO_MLFLOW_ARN')
     aws_region = deployment_info.get('AWS_REGION')
     
     if not all([s3_bucket, execution_role, mlflow_uri, aws_region]):
         missing = []
         if not s3_bucket: missing.append('S3_BUCKET')
         if not execution_role: missing.append('STUDIO_EXECUTION_ROLE')
-        if not mlflow_uri: missing.append('STUDIO_MLFLOW_URL')
+        if not mlflow_uri: missing.append('STUDIO_MLFLOW_ARN')
         if not aws_region: missing.append('AWS_REGION')
         raise ValueError(f"Missing required deployment info: {missing}")
     

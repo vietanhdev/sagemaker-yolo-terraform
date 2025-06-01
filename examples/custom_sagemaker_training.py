@@ -13,7 +13,7 @@ def main():
     """Main training function for custom mode."""
     try:
         # Use the shared training function with custom configuration
-        estimator = run_training(
+        run_training(
             config_file="config_custom.yaml",
             deployment_mode="custom",
             script_name="custom"
