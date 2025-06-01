@@ -6,8 +6,10 @@ Contains common functions used by both Studio and custom training modes.
 
 import os
 import yaml
+import boto3
 from pathlib import Path
 from sagemaker.pytorch import PyTorch
+from sagemaker import Session
 from datetime import datetime
 
 
@@ -58,15 +60,17 @@ def build_training_parameters_studio(config, deployment_info):
     s3_bucket = config['overrides']['s3_bucket'] or deployment_info.get('S3_BUCKET')
     execution_role = config['overrides']['execution_role'] or deployment_info.get('STUDIO_EXECUTION_ROLE')
     mlflow_uri = config['overrides']['mlflow_uri'] or deployment_info.get('STUDIO_MLFLOW_URL')
+    aws_region = deployment_info.get('AWS_REGION')
     
-    if not all([s3_bucket, execution_role, mlflow_uri]):
+    if not all([s3_bucket, execution_role, mlflow_uri, aws_region]):
         missing = []
         if not s3_bucket: missing.append('S3_BUCKET')
         if not execution_role: missing.append('STUDIO_EXECUTION_ROLE')
         if not mlflow_uri: missing.append('STUDIO_MLFLOW_URL')
+        if not aws_region: missing.append('AWS_REGION')
         raise ValueError(f"Missing required deployment info: {missing}")
     
-    return _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri)
+    return _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri, aws_region)
 
 
 def build_training_parameters_custom(config, deployment_info):
@@ -76,18 +80,20 @@ def build_training_parameters_custom(config, deployment_info):
     s3_bucket = config['overrides']['s3_bucket'] or deployment_info.get('S3_BUCKET')
     execution_role = config['overrides']['execution_role'] or deployment_info.get('CUSTOM_SAGEMAKER_EXECUTION_ROLE')
     mlflow_uri = config['overrides']['mlflow_uri'] or deployment_info.get('MLFLOW_UI_URL')
+    aws_region = deployment_info.get('AWS_REGION')
     
-    if not all([s3_bucket, execution_role, mlflow_uri]):
+    if not all([s3_bucket, execution_role, mlflow_uri, aws_region]):
         missing = []
         if not s3_bucket: missing.append('S3_BUCKET')
         if not execution_role: missing.append('CUSTOM_SAGEMAKER_EXECUTION_ROLE')
         if not mlflow_uri: missing.append('MLFLOW_UI_URL')
+        if not aws_region: missing.append('AWS_REGION')
         raise ValueError(f"Missing required deployment info: {missing}")
     
-    return _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri)
+    return _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri, aws_region)
 
 
-def _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri):
+def _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri, aws_region):
     """Build common training parameters shared by both modes."""
     
     # Build S3 paths
@@ -106,25 +112,37 @@ def _build_common_parameters(config, s3_bucket, execution_role, mlflow_uri):
         'mlflow_uri': mlflow_uri,
         's3_dataset_path': s3_dataset_path,
         's3_data_yaml_path': s3_data_yaml_path,
-        'run_name': run_name
+        'run_name': run_name,
+        'aws_region': aws_region
     }
 
 
 def create_estimator(config, parameters):
     """Create SageMaker PyTorch estimator with configuration."""
     
-    estimator = PyTorch(
-        entry_point="yolo_training.py",
-        source_dir="./scripts",
-        role=parameters['execution_role'],
-        instance_type=config['sagemaker']['instance_type'],
-        instance_count=config['sagemaker']['instance_count'],
-        framework_version=config['sagemaker']['framework_version'],
-        py_version=config['sagemaker']['python_version'],
-        environment={
+    # Create SageMaker session with the correct region
+    aws_region = parameters['aws_region']
+    print(f"   Using AWS region: {aws_region}")
+    
+    # Create boto3 session with correct region
+    boto_session = boto3.Session(region_name=aws_region)
+    sagemaker_session = Session(boto_session=boto_session)
+    
+    max_run_seconds = config['sagemaker']['max_run_hours'] * 60 * 60  # Convert hours to seconds
+    
+    # Base estimator parameters
+    estimator_params = {
+        'entry_point': "yolo_training.py",
+        'source_dir': "./scripts",
+        'role': parameters['execution_role'],
+        'instance_type': config['sagemaker']['instance_type'],
+        'instance_count': config['sagemaker']['instance_count'],
+        'framework_version': config['sagemaker']['framework_version'],
+        'py_version': config['sagemaker']['python_version'],
+        'environment': {
             "MLFLOW_TRACKING_URI": parameters['mlflow_uri']
         },
-        hyperparameters={
+        'hyperparameters': {
             'mlflow-uri': parameters['mlflow_uri'],
             'data-path': parameters['s3_data_yaml_path'],
             's3-bucket': parameters['s3_bucket'],
@@ -136,9 +154,17 @@ def create_estimator(config, parameters):
             'experiment-name': config['experiment']['name'],
             'run-name': parameters['run_name']
         },
-        max_run=config['sagemaker']['max_run_hours'] * 60 * 60,  # Convert hours to seconds
-        use_spot_instances=config['sagemaker']['use_spot_instances']
-    )
+        'max_run': max_run_seconds,
+        'use_spot_instances': config['sagemaker']['use_spot_instances'],
+        'sagemaker_session': sagemaker_session  # Use session with correct region
+    }
+    
+    # Add max_wait parameter for spot instances
+    if config['sagemaker']['use_spot_instances']:
+        # max_wait should be at least equal to max_run, typically 1.5-2x for buffer
+        estimator_params['max_wait'] = max_run_seconds * 2  # 2x buffer for spot interruptions
+    
+    estimator = PyTorch(**estimator_params)
     
     return estimator
 
@@ -147,6 +173,7 @@ def print_training_info(config, parameters, mode="Studio"):
     """Print training configuration information."""
     print(f"🚀 Starting SageMaker {mode} training job...")
     print(f"   Using role: {parameters['execution_role']}")
+    print(f"   AWS region: {parameters['aws_region']}")
     print(f"   Instance type: {config['sagemaker']['instance_type']}")
     print(f"   Model: {config['model']['size']}")
     print(f"   Epochs: {config['model']['epochs']}")
@@ -158,6 +185,11 @@ def print_training_info(config, parameters, mode="Studio"):
     print(f"   Training data: {parameters['s3_dataset_path']}")
     print(f"   Spot instances: {config['sagemaker']['use_spot_instances']}")
     print(f"   Max runtime: {config['sagemaker']['max_run_hours']} hours")
+    
+    # Show max wait time for spot instances
+    if config['sagemaker']['use_spot_instances']:
+        max_wait_hours = config['sagemaker']['max_run_hours'] * 2
+        print(f"   Max wait time: {max_wait_hours} hours (2x runtime for spot interruptions)")
 
 
 def run_training(config_file, deployment_mode, script_name="training"):

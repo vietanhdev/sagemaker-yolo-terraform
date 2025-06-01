@@ -3,7 +3,7 @@
 
 # Model Configuration
 model:
-  size: "yolo11s"                    # YOLO model size (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
+  size: "yolo11n"                    # YOLO model size (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
   epochs: 25                         # Number of training epochs
   batch_size: 16                     # Training batch size
   image_size: 640                    # Input image size
