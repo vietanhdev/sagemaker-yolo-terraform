@@ -1,22 +1,28 @@
 #!/bin/bash
 
 # MLflow EC2 Setup Script
-# This script installs and configures MLflow on Amazon Linux 2
+# This script installs and configures MLflow on Amazon Linux 2023
 
 set -e
 
 # Update system
-yum update -y
+dnf update -y
 
 # Install required packages including nmap-ncat for connectivity testing
-yum install -y python3 python3-pip mysql git docker awscli nmap-ncat
+dnf install -y python3 python3-pip git docker awscli nmap-ncat cronie
 
 # Install CloudWatch agent
-yum install -y amazon-cloudwatch-agent
+dnf install -y amazon-cloudwatch-agent
+
+# Start and enable cron service
+systemctl enable crond
+systemctl start crond
 
 # Install Python packages
-pip3 install --upgrade pip
-pip3 install mlflow boto3 PyMySQL cryptography mysql-connector-python
+# Note: Install packages individually to avoid system conflicts
+pip3 install --ignore-installed PyMySQL cryptography mysql-connector-python
+pip3 install --ignore-installed boto3
+pip3 install --ignore-installed mlflow==2.16.2
 
 # Create mlflow user
 useradd -m -s /bin/bash mlflow
@@ -50,8 +56,8 @@ Group=mlflow
 WorkingDirectory=/opt/mlflow
 EnvironmentFile=/opt/mlflow/mlflow.env
 ExecStart=/usr/local/bin/mlflow server \
-    --backend-store-uri $${MLFLOW_BACKEND_STORE_URI} \
-    --default-artifact-root $${MLFLOW_DEFAULT_ARTIFACT_ROOT} \
+    --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} \
+    --default-artifact-root ${MLFLOW_DEFAULT_ARTIFACT_ROOT} \
     --host 0.0.0.0 \
     --port 5000 \
     --workers 2
