@@ -5,6 +5,9 @@
 
 set -e
 
+# Prevent AWS CLI from opening pagers
+export AWS_PAGER=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -148,29 +151,29 @@ cleanup_s3_bucket() {
     print_status "Emptying S3 bucket: $BUCKET_NAME"
     
     # Check if bucket exists
-    if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" 2>/dev/null; then
+    if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" --no-cli-pager 2>/dev/null; then
         print_status "Removing all objects from bucket..."
         
         # Delete all objects and versions
-        aws s3 rm "s3://$BUCKET_NAME" --recursive --region "$AWS_REGION" || true
+        aws s3 rm "s3://$BUCKET_NAME" --recursive --region "$AWS_REGION" --no-cli-pager || true
         
         # Delete any object versions (if versioning was enabled)
         print_status "Removing object versions..."
         aws s3api list-object-versions --bucket "$BUCKET_NAME" --region "$AWS_REGION" \
-            --query 'Versions[].{Key:Key,VersionId:VersionId}' --output text 2>/dev/null | \
+            --query 'Versions[].{Key:Key,VersionId:VersionId}' --output text --no-cli-pager 2>/dev/null | \
         while read key version_id; do
             if [ "$key" != "None" ] && [ "$version_id" != "None" ] && [ ! -z "$key" ]; then
-                aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" --region "$AWS_REGION" || true
+                aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" --region "$AWS_REGION" --no-cli-pager || true
             fi
         done
         
         # Delete any delete markers
         print_status "Removing delete markers..."
         aws s3api list-object-versions --bucket "$BUCKET_NAME" --region "$AWS_REGION" \
-            --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' --output text 2>/dev/null | \
+            --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' --output text --no-cli-pager 2>/dev/null | \
         while read key version_id; do
             if [ "$key" != "None" ] && [ "$version_id" != "None" ] && [ ! -z "$key" ]; then
-                aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" --region "$AWS_REGION" || true
+                aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" --region "$AWS_REGION" --no-cli-pager || true
             fi
         done
         
@@ -204,7 +207,7 @@ cleanup_studio_resources() {
         # List and stop running apps
         aws sagemaker list-apps --domain-id-equals "$STUDIO_DOMAIN_ID" --region "$AWS_REGION" \
             --query 'Apps[?Status==`InService`].[DomainId,UserProfileName,AppType,AppName]' \
-            --output text 2>/dev/null | while read domain_id user_profile app_type app_name; do
+            --output text --no-cli-pager 2>/dev/null | while read domain_id user_profile app_type app_name; do
             if [ ! -z "$app_name" ]; then
                 print_status "Stopping Studio app: $app_name ($app_type) for user $user_profile"
                 aws sagemaker delete-app \
@@ -212,7 +215,7 @@ cleanup_studio_resources() {
                     --user-profile-name "$user_profile" \
                     --app-type "$app_type" \
                     --app-name "$app_name" \
-                    --region "$AWS_REGION" || true
+                    --region "$AWS_REGION" --no-cli-pager || true
             fi
         done
     fi
@@ -225,7 +228,7 @@ cleanup_studio_resources() {
             STATUS=$(aws sagemaker describe-mlflow-tracking-server \
                 --tracking-server-name "$TRACKING_SERVER_NAME" \
                 --region "$AWS_REGION" \
-                --query 'TrackingServerStatus' --output text 2>/dev/null || echo "NotFound")
+                --query 'TrackingServerStatus' --output text --no-cli-pager 2>/dev/null || echo "NotFound")
             print_status "MLflow tracking server status: $STATUS"
         fi
     fi
@@ -249,13 +252,13 @@ cleanup_custom_resources() {
             --instance-ids "$EC2_INSTANCE_ID" \
             --region "$AWS_REGION" \
             --query 'Reservations[0].Instances[0].State.Name' \
-            --output text 2>/dev/null || echo "not-found")
+            --output text --no-cli-pager 2>/dev/null || echo "not-found")
         
         print_status "EC2 instance state: $INSTANCE_STATE"
         
         if [ "$INSTANCE_STATE" = "running" ]; then
             print_status "Stopping EC2 instance gracefully..."
-            aws ec2 stop-instances --instance-ids "$EC2_INSTANCE_ID" --region "$AWS_REGION" || true
+            aws ec2 stop-instances --instance-ids "$EC2_INSTANCE_ID" --region "$AWS_REGION" --no-cli-pager || true
             
             # Wait a moment for graceful shutdown
             sleep 10
@@ -271,7 +274,7 @@ cleanup_custom_resources() {
                 --db-instance-identifier "$RDS_IDENTIFIER" \
                 --region "$AWS_REGION" \
                 --query 'DBInstances[0].DBInstanceStatus' \
-                --output text 2>/dev/null || echo "not-found")
+                --output text --no-cli-pager 2>/dev/null || echo "not-found")
             print_status "RDS instance status: $RDS_STATUS"
         fi
     fi
@@ -288,10 +291,10 @@ cleanup_sagemaker_training_jobs() {
         --status-equals InProgress \
         --region "$AWS_REGION" \
         --query 'TrainingJobSummaries[].TrainingJobName' \
-        --output text 2>/dev/null | while read job_name; do
+        --output text --no-cli-pager 2>/dev/null | while read job_name; do
         if [ ! -z "$job_name" ] && [[ "$job_name" == *"$PROJECT_NAME"* ]]; then
             print_status "Stopping training job: $job_name"
-            aws sagemaker stop-training-job --training-job-name "$job_name" --region "$AWS_REGION" || true
+            aws sagemaker stop-training-job --training-job-name "$job_name" --region "$AWS_REGION" --no-cli-pager || true
         fi
     done
 }
@@ -304,7 +307,7 @@ destroy_infrastructure() {
     
     # Create destroy plan
     print_status "Creating destruction plan..."
-    terraform plan -destroy -out=destroy_plan
+    terraform plan -destroy -out=destroy_plan -input=false
     
     echo
     print_warning "⚠️  DANGER ZONE ⚠️"
@@ -341,7 +344,7 @@ destroy_infrastructure() {
         fi
         
         # Run terraform destroy with better error handling
-        if terraform apply destroy_plan; then
+        if terraform apply destroy_plan -input=false -auto-approve; then
             print_success "Infrastructure destroyed successfully!"
         else
             print_error "Destruction failed or was interrupted!"
@@ -432,7 +435,7 @@ verify_cleanup() {
     
     # Quick AWS check
     if [ ! -z "$BUCKET_NAME" ]; then
-        if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" 2>/dev/null; then
+        if aws s3api head-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" --no-cli-pager 2>/dev/null; then
             print_warning "S3 bucket $BUCKET_NAME still exists"
         else
             print_success "S3 bucket successfully removed"
