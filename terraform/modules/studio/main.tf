@@ -40,7 +40,7 @@ resource "aws_subnet" "studio_subnet" {
   count = length(data.aws_subnets.default.ids) == 0 ? min(length(data.aws_availability_zones.available.names), 2) : 0
   
   vpc_id            = data.aws_vpc.default.id
-  cidr_block        = "172.31.${count.index * 16}.0/20"  # Use standard default VPC CIDR pattern
+  cidr_block        = "172.31.${32 + count.index * 16}.0/20"  # Use 172.31.32.0/20, 172.31.48.0/20 to avoid conflicts
   availability_zone = data.aws_availability_zones.available.names[count.index]
   
   map_public_ip_on_launch = true  # SageMaker Studio needs internet access
