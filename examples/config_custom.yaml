@@ -4,7 +4,7 @@
 # Model Configuration
 model:
   size: "yolo11n"                    # YOLO model size (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
-  epochs: 25                         # Number of training epochs
+  epochs: 2                          # Number of training epochs
   batch_size: 16                     # Training batch size
   image_size: 640                    # Input image size
 
@@ -13,7 +13,7 @@ sagemaker:
   instance_type: "ml.g4dn.xlarge"    # SageMaker instance type for training
   instance_count: 1                  # Number of instances
   max_run_hours: 4                   # Maximum runtime in hours
-  use_spot_instances: true           # Use spot instances for cost savings
+  use_spot_instances: false          # Use spot instances for cost savings
   framework_version: "2.0"           # PyTorch version
   python_version: "py310"            # Python version
 
