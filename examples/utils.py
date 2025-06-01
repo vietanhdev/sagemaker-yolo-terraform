@@ -151,8 +151,7 @@ def create_estimator(config, parameters):
             'epochs': config['model']['epochs'],
             'batch-size': config['model']['batch_size'],
             'imgsz': config['model']['image_size'],
-            'experiment-name': config['experiment']['name'],
-            'run-name': parameters['run_name']
+            'experiment-name': config['experiment']['name']
         },
         'max_run': max_run_seconds,
         'use_spot_instances': config['sagemaker']['use_spot_instances'],
