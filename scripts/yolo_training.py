@@ -9,6 +9,7 @@ import os
 import argparse
 import json
 import time
+import re
 from pathlib import Path
 import logging
 
@@ -34,6 +35,19 @@ class YOLOSageMakerMLflowTracker:
         self.mlflow_uri = mlflow_uri
         self.experiment_name = experiment_name
         self.setup_mlflow()
+        
+    def sanitize_metric_name(self, name):
+        """
+        Sanitize metric names for MLflow compatibility.
+        MLflow allows: alphanumerics, underscores (_), dashes (-), periods (.), spaces ( ) and slashes (/).
+        """
+        # Replace parentheses and other invalid characters with underscores
+        sanitized = re.sub(r'[^a-zA-Z0-9_\-\.\s/]', '_', str(name))
+        # Remove multiple consecutive underscores
+        sanitized = re.sub(r'_+', '_', sanitized)
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+        return sanitized
         
     def setup_mlflow(self):
         """Setup SageMaker MLflow tracking"""
@@ -135,13 +149,18 @@ class YOLOSageMakerMLflowTracker:
                     close_mosaic=10,  # Close mosaic augmentation in last N epochs
                 )
                 
-                # Log training metrics
+                # Log training metrics with sanitized names
                 if hasattr(results, 'results_dict'):
                     for key, value in results.results_dict.items():
                         if isinstance(value, (int, float)) and not np.isnan(value):
-                            mlflow.log_metric(key, value)
+                            sanitized_key = self.sanitize_metric_name(key)
+                            try:
+                                mlflow.log_metric(sanitized_key, value)
+                                logger.debug(f"Logged metric: {sanitized_key} = {value}")
+                            except Exception as e:
+                                logger.warning(f"Failed to log metric {sanitized_key}: {e}")
                 
-                # Log final metrics from the results
+                # Log final metrics from the results with sanitized names
                 if hasattr(results, 'box') and hasattr(results.box, 'map'):
                     mlflow.log_metric("final_map", results.box.map)
                     mlflow.log_metric("final_map50", results.box.map50)
