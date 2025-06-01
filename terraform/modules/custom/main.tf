@@ -1,4 +1,4 @@
-# EC2-based MLflow Deployment Module
+# Custom EC2-based MLflow Deployment Module
 # This module sets up MLflow on EC2 with RDS backend store
 
 # Data sources

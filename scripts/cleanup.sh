@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # MLflow YOLO Platform Cleanup Script
-# This script safely destroys infrastructure for both Studio and EC2 deployment modes
+# This script safely destroys infrastructure for both Studio and Custom deployment modes
 
 set -e
 
@@ -75,7 +75,7 @@ detect_deployment_info() {
         MLFLOW_ARN=$(terraform output -raw studio_mlflow_tracking_server_arn 2>/dev/null || echo "")
         print_status "Studio domain ID: ${STUDIO_DOMAIN_ID:-'Not found'}"
         print_status "MLflow tracking server ARN: ${MLFLOW_ARN:-'Not found'}"
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
         EC2_INSTANCE_ID=$(terraform output -raw mlflow_server_instance_id 2>/dev/null || echo "")
         RDS_ENDPOINT=$(terraform output -raw rds_endpoint 2>/dev/null || echo "")
         SECRET_ARN=$(terraform output -raw secrets_manager_secret_arn 2>/dev/null || echo "")
@@ -110,7 +110,7 @@ show_current_resources() {
         echo
         echo "🧠 MLflow Resources:"
         terraform show | grep -E "mlflow" | sed 's/^/  /' | head -5
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
         echo "🖥️ EC2 Resources:"
         terraform show | grep -E "aws_instance|aws_security_group" | sed 's/^/  /'
         echo
@@ -184,8 +184,8 @@ cleanup_s3_bucket() {
 cleanup_deployment_specific() {
     if [ "$DEPLOYMENT_MODE" = "studio" ]; then
         cleanup_studio_resources
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
-        cleanup_ec2_resources
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
+        cleanup_custom_resources
     else
         print_warning "Unknown deployment mode: $DEPLOYMENT_MODE. Skipping mode-specific cleanup."
     fi
@@ -236,9 +236,9 @@ cleanup_studio_resources() {
     print_success "Studio mode cleanup completed"
 }
 
-# EC2 mode specific cleanup
-cleanup_ec2_resources() {
-    print_header "EC2 Mode Cleanup"
+# Custom mode specific cleanup
+cleanup_custom_resources() {
+    print_header "Custom Mode Cleanup"
     
     print_status "Checking EC2 and RDS resources..."
     
@@ -276,7 +276,7 @@ cleanup_ec2_resources() {
         fi
     fi
     
-    print_success "EC2 mode cleanup completed"
+    print_success "Custom mode cleanup completed"
 }
 
 # Stop running SageMaker training jobs
@@ -317,7 +317,7 @@ destroy_infrastructure() {
         print_warning "• MLflow Tracking Server and all experiments"
         print_warning "• S3 bucket and all stored artifacts"
         print_warning "• All IAM roles and policies"
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
         print_warning "This includes:"
         print_warning "• EC2 MLflow server and all experiments"
         print_warning "• RDS MySQL database and all metadata"
@@ -336,7 +336,7 @@ destroy_infrastructure() {
         
         if [ "$DEPLOYMENT_MODE" = "studio" ]; then
             print_status "Destroying SageMaker Studio and MLflow resources..."
-        elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+        elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
             print_status "Destroying EC2, RDS, and MLflow resources..."
         fi
         
@@ -485,8 +485,8 @@ main() {
         echo "• SageMaker Studio Domain and User Profiles ✅"
         echo "• MLflow Tracking Server ✅"
         echo "• S3 artifacts bucket ✅"
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
-        echo "EC2 resources cleaned up:"
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
+        echo "Custom resources cleaned up:"
         echo "• EC2 MLflow server ✅"
         echo "• RDS MySQL database ✅"
         echo "• S3 artifacts bucket ✅"

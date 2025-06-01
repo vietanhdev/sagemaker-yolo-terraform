@@ -2,7 +2,7 @@
 
 > **Deploy enterprise-grade ML infrastructure with two flexible deployment options**
 
-A comprehensive Terraform platform for YOLO model training and experiment tracking, offering both **SageMaker Studio** and **EC2-based** deployment options.
+A comprehensive Terraform platform for YOLO model training and experiment tracking, offering both **SageMaker Studio** and **Custom EC2-based** deployment options.
 
 ## 🎯 **Deployment Options**
 
@@ -22,7 +22,7 @@ A comprehensive Terraform platform for YOLO model training and experiment tracki
 - Built-in security and compliance features
 - Team collaboration capabilities
 
-### **Option 2: EC2-based MLflow with RDS**
+### **Option 2: Custom EC2-based MLflow with RDS**
 ```
 🖥️ EC2 MLflow Server                 ←  Self-hosted, full control
 🗄️ RDS MySQL Database               ←  Scalable backend store
@@ -89,7 +89,7 @@ graph TB
     class DEV,BROWSER user
 ```
 
-### **EC2-based Architecture**
+### **Custom EC2-based Architecture**
 ```mermaid
 graph TB
     subgraph "Developer Environment"
@@ -97,7 +97,7 @@ graph TB
         TOOLS[🛠️ Local Tools<br/>VS Code, CLI, etc.]
     end
 
-    subgraph "AWS EC2-based Infrastructure"
+    subgraph "AWS Custom EC2-based Infrastructure"
         subgraph "Application Layer"
             EC2[🖥️ EC2 Instance<br/>MLflow Server<br/>Auto-configured]
             MLflow[🧠 MLflow Service<br/>Port 5000<br/>Web Interface]
@@ -167,15 +167,15 @@ terraform apply   # Deploy (5-8 minutes)
 # Go to AWS Console → SageMaker → Studio → Launch Studio
 ```
 
-### **EC2 Deployment**
+### **Custom Deployment**
 ```bash
 # 1. Create AWS Key Pair
 aws ec2 create-key-pair --key-name my-mlflow-key \
     --query 'KeyMaterial' --output text > my-mlflow-key.pem
 chmod 400 my-mlflow-key.pem
 
-# 2. Configure for EC2
-cp terraform-ec2.tfvars.example terraform.tfvars
+# 2. Configure for Custom deployment
+cp terraform-custom.tfvars.example terraform.tfvars
 # Edit terraform.tfvars: set key_pair_name = "my-mlflow-key"
 
 # 3. Deploy
@@ -189,7 +189,7 @@ terraform apply   # Deploy (8-12 minutes)
 
 ## 📊 **Deployment Comparison**
 
-| Feature | Studio Mode | EC2 Mode |
+| Feature | Studio Mode | Custom Mode |
 |---------|-------------|----------|
 | **Management** | Fully managed | Self-managed |
 | **Setup Time** | 30-40 minutes* | 8-12 minutes |
@@ -209,7 +209,7 @@ terraform apply   # Deploy (8-12 minutes)
 # terraform.tfvars
 aws_region = "us-east-1"
 project_name = "my-yolo-project"
-deployment_mode = "studio"  # or "ec2"
+deployment_mode = "studio"  # or "custom"
 sagemaker_instance_type = "ml.g4dn.xlarge"
 ```
 
@@ -220,7 +220,7 @@ enable_studio_code_editor = true
 enable_studio_jupyter_server = true
 ```
 
-### **EC2-specific**
+### **Custom-specific**
 ```hcl
 ec2_instance_type = "t3.medium"
 key_pair_name = "my-key-pair"  # REQUIRED
@@ -248,13 +248,13 @@ with mlflow.start_run():
     mlflow.pytorch.log_model(model, "yolo-model")
 ```
 
-### **EC2 Mode Workflow**
+### **Custom Mode Workflow**
 ```python
 # Local development or remote training
 import mlflow
 import mlflow.pytorch
 
-# Set tracking URI to your EC2 MLflow server
+# Set tracking URI to your Custom EC2 MLflow server
 mlflow.set_tracking_uri("http://YOUR_EC2_IP:5000")
 mlflow.set_experiment("yolo-v11-experiment")
 
@@ -335,7 +335,7 @@ datasets/
 - VPC isolation capabilities
 - Enterprise compliance ready
 
-### **EC2 Mode Security**
+### **Custom Mode Security**
 - Private database subnets
 - Encrypted credential storage
 - SSH key-based access
@@ -353,7 +353,7 @@ Monthly Estimate (us-east-1):
 └── Total: ~$80-150/month
 ```
 
-### **EC2 Mode Costs**
+### **Custom Mode Costs**
 ```
 Monthly Estimate (us-east-1):
 ├── EC2 t3.medium (24/7): $30-40
@@ -398,7 +398,7 @@ aws s3 rm s3://your-bucket-name --recursive
 ### **Switch Between Modes**
 ```bash
 # Change deployment_mode in terraform.tfvars
-deployment_mode = "ec2"  # Switch from "studio" to "ec2"
+deployment_mode = "custom"  # Switch from "studio" to "custom"
 
 # Apply changes (S3 bucket and data preserved)
 terraform plan
@@ -418,7 +418,7 @@ Both modules can be modified to use custom VPCs for enhanced network control.
 ### **High Availability Setup**
 - Multi-AZ RDS deployment
 - Application Load Balancer integration
-- Auto Scaling Groups for EC2 mode
+- Auto Scaling Groups for Custom mode
 
 ### **CI/CD Integration**
 ```yaml

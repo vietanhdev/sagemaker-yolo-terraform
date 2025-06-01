@@ -12,12 +12,12 @@ variable "project_name" {
 
 # Deployment Configuration
 variable "deployment_mode" {
-  description = "Deployment mode: 'studio' for SageMaker Studio with integrated services, 'ec2' for EC2-based MLflow with RDS"
+  description = "Deployment mode: 'studio' for SageMaker Studio with integrated services, 'custom' for EC2-based MLflow with RDS"
   type        = string
   default     = "studio"
   validation {
-    condition     = contains(["studio", "ec2"], var.deployment_mode)
-    error_message = "Deployment mode must be either 'studio' or 'ec2'."
+    condition     = contains(["studio", "custom"], var.deployment_mode)
+    error_message = "Deployment mode must be either 'studio' or 'custom'."
   }
 }
 
@@ -64,7 +64,7 @@ variable "weekly_maintenance_window_start" {
   }
 }
 
-# EC2 Configuration (only used when deployment_mode = "ec2")
+# Custom Configuration (only used when deployment_mode = "custom")
 variable "ec2_instance_type" {
   description = "EC2 instance type for MLflow server"
   type        = string
@@ -72,12 +72,12 @@ variable "ec2_instance_type" {
 }
 
 variable "key_pair_name" {
-  description = "AWS Key Pair name for EC2 instances (required for EC2 deployment)"
+  description = "AWS Key Pair name for EC2 instances (required for custom deployment)"
   type        = string
   default     = ""
 }
 
-# RDS Configuration (only used when deployment_mode = "ec2")
+# RDS Configuration (only used when deployment_mode = "custom")
 variable "db_instance_class" {
   description = "RDS instance class for MLflow backend store"
   type        = string

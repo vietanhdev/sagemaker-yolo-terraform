@@ -5,7 +5,7 @@ output "project_name" {
 }
 
 output "deployment_mode" {
-  description = "Deployment mode (studio or ec2)"
+  description = "Deployment mode (studio or custom)"
   value       = var.deployment_mode
 }
 
@@ -55,50 +55,50 @@ output "studio_execution_role_arn" {
   value       = var.deployment_mode == "studio" ? module.studio[0].studio_execution_role_arn : null
 }
 
-# EC2-specific outputs
+# Custom-specific outputs
 output "mlflow_server_public_ip" {
-  description = "Public IP address of the MLflow server (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].mlflow_server_public_ip : null
+  description = "Public IP address of the MLflow server (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].mlflow_server_public_ip : null
 }
 
 output "mlflow_server_private_ip" {
-  description = "Private IP address of the MLflow server (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].mlflow_server_private_ip : null
+  description = "Private IP address of the MLflow server (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].mlflow_server_private_ip : null
 }
 
 output "mlflow_server_instance_id" {
-  description = "Instance ID of the MLflow server (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].mlflow_server_instance_id : null
+  description = "Instance ID of the MLflow server (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].mlflow_server_instance_id : null
 }
 
 output "mlflow_ui_url" {
-  description = "MLflow UI URL (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].mlflow_ui_url : null
+  description = "MLflow UI URL (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].mlflow_ui_url : null
 }
 
 output "rds_endpoint" {
-  description = "RDS instance endpoint (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].rds_endpoint : null
+  description = "RDS instance endpoint (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].rds_endpoint : null
 }
 
 output "rds_port" {
-  description = "RDS instance port (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].rds_port : null
+  description = "RDS instance port (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].rds_port : null
 }
 
 output "database_name" {
-  description = "MLflow database name (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].database_name : null
+  description = "MLflow database name (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].database_name : null
 }
 
 output "database_username" {
-  description = "MLflow database username (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].database_username : null
+  description = "MLflow database username (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].database_username : null
 }
 
 output "secrets_manager_secret_arn" {
-  description = "Secrets Manager secret ARN for database credentials (EC2 mode only)"
-  value       = var.deployment_mode == "ec2" ? module.ec2[0].secrets_manager_secret_arn : null
+  description = "Secrets Manager secret ARN for database credentials (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].secrets_manager_secret_arn : null
 }
 
 # Connection information summary
@@ -110,13 +110,13 @@ output "connection_info" {
     mlflow_server_url = var.deployment_mode == "studio" ? module.studio[0].mlflow_tracking_server_url : null
     artifact_store = "s3://${aws_s3_bucket.mlflow_bucket.bucket}/mlflow-artifacts"
     access_instructions = "Go to AWS Console → SageMaker → Studio, then launch Studio for your user profile"
-    } : var.deployment_mode == "ec2" ? {
-    mode = "EC2 with RDS"
-    mlflow_ui_url = var.deployment_mode == "ec2" ? module.ec2[0].mlflow_ui_url : null
-    ssh_connection = var.deployment_mode == "ec2" && var.key_pair_name != "" ? "ssh -i ${var.key_pair_name}.pem ec2-user@${module.ec2[0].mlflow_server_public_ip}" : "Key pair not specified"
-    database_endpoint = var.deployment_mode == "ec2" ? module.ec2[0].rds_endpoint : null
+    } : var.deployment_mode == "custom" ? {
+    mode = "Custom EC2 with RDS"
+    mlflow_ui_url = var.deployment_mode == "custom" ? module.custom[0].mlflow_ui_url : null
+    ssh_connection = var.deployment_mode == "custom" && var.key_pair_name != "" ? "ssh -i ${var.key_pair_name}.pem ec2-user@${module.custom[0].mlflow_server_public_ip}" : "Key pair not specified"
+    database_endpoint = var.deployment_mode == "custom" ? module.custom[0].rds_endpoint : null
     artifact_store = "s3://${aws_s3_bucket.mlflow_bucket.bucket}/mlflow-artifacts"
-    access_instructions = "Open ${module.ec2[0].mlflow_ui_url} in your browser"
+    access_instructions = "Open ${module.custom[0].mlflow_ui_url} in your browser"
     } : {
     mode = "Unknown"
     artifact_store = "s3://${aws_s3_bucket.mlflow_bucket.bucket}/mlflow-artifacts"

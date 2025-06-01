@@ -67,7 +67,7 @@ resource "aws_s3_bucket_public_access_block" "mlflow_bucket_pab" {
 # Conditional deployment based on deployment_mode
 locals {
   is_studio_mode = var.deployment_mode == "studio"
-  is_ec2_mode    = var.deployment_mode == "ec2"
+  is_custom_mode = var.deployment_mode == "custom"
 }
 
 # Studio Module (for SageMaker Studio deployment)
@@ -87,10 +87,10 @@ module "studio" {
   weekly_maintenance_window_start = var.weekly_maintenance_window_start
 }
 
-# EC2 Module (for EC2-based MLflow with RDS)
-module "ec2" {
-  count  = local.is_ec2_mode ? 1 : 0
-  source = "./modules/ec2"
+# Custom Module (for EC2-based MLflow with RDS)
+module "custom" {
+  count  = local.is_custom_mode ? 1 : 0
+  source = "./modules/custom"
 
   project_name         = var.project_name
   aws_region           = var.aws_region

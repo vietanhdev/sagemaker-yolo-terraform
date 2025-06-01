@@ -70,7 +70,7 @@ detect_deployment_mode() {
     # Check if terraform.tfvars exists
     if [ ! -f "terraform.tfvars" ]; then
         print_warning "No terraform.tfvars found. Using default Studio mode."
-        print_status "To customize deployment, copy terraform-studio.tfvars.example or terraform-ec2.tfvars.example to terraform.tfvars"
+        print_status "To customize deployment, copy terraform-studio.tfvars.example or terraform-custom.tfvars.example to terraform.tfvars"
         DEPLOYMENT_MODE="studio"
     else
         # Extract deployment mode from terraform.tfvars
@@ -80,16 +80,16 @@ detect_deployment_mode() {
     print_status "Deployment mode: $DEPLOYMENT_MODE"
     
     # Validate deployment mode
-    if [[ "$DEPLOYMENT_MODE" != "studio" && "$DEPLOYMENT_MODE" != "ec2" ]]; then
-        print_error "Invalid deployment mode: $DEPLOYMENT_MODE. Must be 'studio' or 'ec2'."
+    if [[ "$DEPLOYMENT_MODE" != "studio" && "$DEPLOYMENT_MODE" != "custom" ]]; then
+        print_error "Invalid deployment mode: $DEPLOYMENT_MODE. Must be 'studio' or 'custom'."
         exit 1
     fi
     
-    # Check EC2 mode requirements
-    if [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+    # Check Custom mode requirements
+    if [ "$DEPLOYMENT_MODE" = "custom" ]; then
         KEY_PAIR_NAME=$(grep -E '^key_pair_name\s*=' terraform.tfvars | sed 's/.*=\s*"\([^"]*\)".*/\1/' || echo "")
         if [ -z "$KEY_PAIR_NAME" ] || [ "$KEY_PAIR_NAME" = "" ]; then
-            print_error "EC2 deployment mode requires key_pair_name to be set in terraform.tfvars"
+            print_error "Custom deployment mode requires key_pair_name to be set in terraform.tfvars"
             print_error "Create a key pair: aws ec2 create-key-pair --key-name my-key --query 'KeyMaterial' --output text > my-key.pem"
             print_error "Then set: key_pair_name = \"my-key\" in terraform.tfvars"
             exit 1
@@ -138,8 +138,8 @@ wait_for_services() {
     
     if [ "$DEPLOYMENT_MODE" = "studio" ]; then
         wait_for_studio_mlflow
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
-        wait_for_ec2_mlflow
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
+        wait_for_custom_mlflow
     fi
     
     cd ..
@@ -239,9 +239,9 @@ wait_for_studio_mlflow() {
     return 0
 }
 
-# Wait for EC2 MLflow server to be ready (EC2 mode)
-wait_for_ec2_mlflow() {
-    print_status "Waiting for EC2 MLflow server to be ready..."
+# Wait for Custom MLflow server to be ready (Custom mode)
+wait_for_custom_mlflow() {
+    print_status "Waiting for Custom EC2 MLflow server to be ready..."
     print_warning "This may take 5-15 minutes for the EC2 instance to start and configure MLflow..."
     
     EC2_PUBLIC_IP=$(terraform output -raw mlflow_server_public_ip 2>/dev/null || echo "")
@@ -259,7 +259,7 @@ wait_for_ec2_mlflow() {
         
         # Check if MLflow server is responding
         if curl -s --connect-timeout 5 "http://$EC2_PUBLIC_IP:5000/health" > /dev/null 2>&1; then
-            print_success "EC2 MLflow server is ready!"
+            print_success "Custom EC2 MLflow server is ready!"
             return 0
         else
             print_status "MLflow server not yet responding - still configuring..."
@@ -269,7 +269,7 @@ wait_for_ec2_mlflow() {
         ((attempt++))
     done
     
-    print_warning "EC2 MLflow server is taking longer than expected to initialize."
+    print_warning "Custom EC2 MLflow server is taking longer than expected to initialize."
     print_warning "You can check the instance logs: aws logs tail /aws/ec2/mlflow/$(terraform output -raw project_name) --region $(terraform output -raw aws_region)"
     return 0
 }
@@ -309,9 +309,9 @@ STUDIO_EXECUTION_ROLE=$(terraform output -raw studio_execution_role_arn)
 # 4. Upload datasets to S3_BUCKET
 # 5. Use STUDIO_EXECUTION_ROLE for SageMaker training jobs
 EOF
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
         cat >> ../deployment_info.txt << EOF
-# EC2 Mode Configuration
+# Custom Mode Configuration
 MLFLOW_UI_URL=$(terraform output -raw mlflow_ui_url)
 EC2_PUBLIC_IP=$(terraform output -raw mlflow_server_public_ip)
 EC2_PRIVATE_IP=$(terraform output -raw mlflow_server_private_ip)
@@ -362,8 +362,8 @@ show_completion_message() {
         echo "  mlflow.set_tracking_uri('$(terraform output -raw studio_mlflow_tracking_server_url)')"
         echo "  mlflow.set_experiment('yolo-training')"
         
-    elif [ "$DEPLOYMENT_MODE" = "ec2" ]; then
-        echo "🖥️ EC2-based MLflow Infrastructure is ready!"
+    elif [ "$DEPLOYMENT_MODE" = "custom" ]; then
+        echo "🖥️ Custom EC2-based MLflow Infrastructure is ready!"
         echo
         echo "📊 MLflow UI: $(terraform output -raw mlflow_ui_url)"
         echo "🖥️ EC2 Instance: $(terraform output -raw mlflow_server_public_ip)"
