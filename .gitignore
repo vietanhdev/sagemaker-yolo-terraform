@@ -6,6 +6,7 @@
 terraform.tfstate.backup
 .terraform.lock.hcl
 tfplan
+destroy_plan
 
 
 # AWS credentials and sensitive files
@@ -94,3 +95,4 @@ Thumbs.db
 mlflow_artifacts/
 artifacts/ 
 terraform/tfplan
+terraform/destroy_plan

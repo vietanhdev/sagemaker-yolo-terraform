@@ -5,7 +5,7 @@ aws_region = "us-east-1"
 project_name = "yolo-mlflow"
 
 # Deployment Mode: "studio" for SageMaker Studio, "custom" for custom EC2-based deployment
-deployment_mode = "studio"
+deployment_mode = "custom"
 
 # Compute Configuration
 sagemaker_instance_type = "ml.g4dn.xlarge"  # GPU instance for YOLO training
@@ -17,7 +17,7 @@ enable_studio_jupyter_server = true
 
 # Custom Configuration (only used when deployment_mode = "custom")
 ec2_instance_type = "t3.medium"
-key_pair_name = ""  # REQUIRED for custom mode - set to your AWS key pair name
+key_pair_name = "my-key"  # REQUIRED for custom mode - set to your AWS key pair name
 
 # RDS Configuration (only used when deployment_mode = "custom")
 db_instance_class = "db.t3.micro"

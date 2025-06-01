@@ -76,6 +76,21 @@ output "mlflow_ui_url" {
   value       = var.deployment_mode == "custom" ? module.custom[0].mlflow_ui_url : null
 }
 
+output "key_pair_name" {
+  description = "Name of the created key pair (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].key_pair_name : null
+}
+
+output "private_key_file" {
+  description = "Path to the private key file (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].private_key_file : null
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the MLflow server (custom mode only)"
+  value       = var.deployment_mode == "custom" ? module.custom[0].ssh_command : null
+}
+
 output "rds_endpoint" {
   description = "RDS instance endpoint (custom mode only)"
   value       = var.deployment_mode == "custom" ? module.custom[0].rds_endpoint : null

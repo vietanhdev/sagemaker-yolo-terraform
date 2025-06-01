@@ -169,7 +169,8 @@ terraform apply   # Deploy (5-8 minutes)
 
 ### **Custom Deployment**
 ```bash
-# 1. Create AWS Key Pair
+# ⚠️  IMPORTANT: Key pair is REQUIRED for Custom mode
+# Create AWS Key Pair FIRST (before terraform apply)
 aws ec2 create-key-pair --key-name my-mlflow-key \
     --query 'KeyMaterial' --output text > my-mlflow-key.pem
 chmod 400 my-mlflow-key.pem
@@ -392,6 +393,71 @@ terraform destroy
 # Confirm deletion of S3 objects if needed
 aws s3 rm s3://your-bucket-name --recursive
 ```
+
+## 🛠️ **Troubleshooting**
+
+### **Common Issues**
+
+#### **Custom Mode: Missing Key Pair Error**
+```
+❌ Custom deployment mode requires key_pair_name to be set in terraform.tfvars
+```
+
+**Solution:**
+```bash
+# 1. Create the key pair
+aws ec2 create-key-pair --key-name my-key \
+    --query 'KeyMaterial' --output text > my-key.pem
+chmod 600 my-key.pem
+
+# 2. Update terraform.tfvars
+# Set: key_pair_name = "my-key"
+
+# 3. Apply terraform
+terraform apply
+```
+
+#### **Studio Mode: MLflow Server Setup Takes 25+ Minutes**
+This is normal behavior. The SageMaker MLflow tracking server requires initial setup time.
+
+**Monitoring Progress:**
+```bash
+# Check CloudFormation stack status
+aws cloudformation describe-stacks \
+    --stack-name sagemaker-mlflow-* \
+    --query 'Stacks[0].StackStatus'
+```
+
+#### **S3 Access Denied Errors**
+**Solution:** Verify IAM roles have proper S3 permissions:
+```bash
+# Check IAM role policies
+aws iam list-attached-role-policies --role-name YourRoleName
+```
+
+#### **RDS Connection Issues (Custom Mode)**
+**Solution:** Check security groups and VPC configuration:
+```bash
+# Test database connectivity from EC2
+terraform output rds_endpoint
+# SSH into EC2 and test: mysql -h <endpoint> -u <username> -p
+```
+
+#### **Terraform State Lock Issues**
+**Solution:**
+```bash
+# Force unlock (use with caution)
+terraform force-unlock <lock-id>
+
+# Or check for existing terraform processes
+ps aux | grep terraform
+```
+
+### **Getting Help**
+- 📋 Check CloudWatch logs for detailed error messages
+- 🔍 Use `terraform plan` to preview changes before applying
+- 📞 AWS Support for service-specific issues
+- 📖 Terraform documentation for configuration problems
 
 ## 🔄 **Migration & Upgrades**
 

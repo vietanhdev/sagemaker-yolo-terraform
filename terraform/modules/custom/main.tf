@@ -23,6 +23,32 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+# Generate private key for the key pair
+resource "tls_private_key" "mlflow_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# Create key pair in the current region
+resource "aws_key_pair" "mlflow_key" {
+  key_name   = "${var.key_pair_name}-${var.bucket_suffix}"
+  public_key = tls_private_key.mlflow_key.public_key_openssh
+
+  tags = {
+    Name = "${var.project_name}-key-pair"
+    Environment = "dev"
+    Project = var.project_name
+    Region = var.aws_region
+  }
+}
+
+# Save private key to local file
+resource "local_file" "private_key" {
+  content  = tls_private_key.mlflow_key.private_key_pem
+  filename = "${path.root}/../${aws_key_pair.mlflow_key.key_name}.pem"
+  file_permission = "0600"
+}
+
 # Random password for RDS
 resource "random_password" "db_password" {
   length  = 16
@@ -245,7 +271,7 @@ locals {
     db_password                = random_password.db_password.result
     aws_region                 = var.aws_region
     secret_arn                 = aws_secretsmanager_secret.db_credentials.arn
-    MLFLOW_BACKEND_STORE_URI   = "mysql+pymysql://${aws_db_instance.mlflow_db.username}:${random_password.db_password.result}@${aws_db_instance.mlflow_db.endpoint}:${aws_db_instance.mlflow_db.port}/${aws_db_instance.mlflow_db.db_name}"
+    MLFLOW_BACKEND_STORE_URI   = "mysql+pymysql://${aws_db_instance.mlflow_db.username}:${random_password.db_password.result}@${aws_db_instance.mlflow_db.endpoint}/${aws_db_instance.mlflow_db.db_name}"
     MLFLOW_DEFAULT_ARTIFACT_ROOT = "s3://${var.mlflow_bucket_name}/mlflow-artifacts"
   })
 }
@@ -254,7 +280,8 @@ locals {
 resource "aws_instance" "mlflow_server" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.ec2_instance_type
-  key_name              = var.key_pair_name
+  key_name              = aws_key_pair.mlflow_key.key_name
+  subnet_id             = data.aws_subnets.default.ids[0]
   vpc_security_group_ids = [aws_security_group.mlflow_ec2_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_mlflow_profile.name
   

@@ -8,15 +8,15 @@ set -e
 # Update system
 yum update -y
 
-# Install required packages
-yum install -y python3 python3-pip mysql git docker awscli
+# Install required packages including nmap-ncat for connectivity testing
+yum install -y python3 python3-pip mysql git docker awscli nmap-ncat
 
 # Install CloudWatch agent
 yum install -y amazon-cloudwatch-agent
 
 # Install Python packages
 pip3 install --upgrade pip
-pip3 install mlflow boto3 PyMySQL cryptography
+pip3 install mlflow boto3 PyMySQL cryptography mysql-connector-python
 
 # Create mlflow user
 useradd -m -s /bin/bash mlflow
@@ -27,9 +27,12 @@ mkdir -p /home/mlflow/logs
 mkdir -p /opt/mlflow
 chown -R mlflow:mlflow /home/mlflow /opt/mlflow
 
+# URL encode the database password to handle special characters
+DB_PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${db_password}', safe=''))")
+
 # Configure MLflow environment
 cat > /opt/mlflow/mlflow.env << EOF
-MLFLOW_BACKEND_STORE_URI=mysql+pymysql://${db_username}:${db_password}@${db_endpoint}:${db_port}/${db_name}
+MLFLOW_BACKEND_STORE_URI=mysql+pymysql://${db_username}:$DB_PASSWORD_ENCODED@${db_endpoint}/${db_name}
 MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${mlflow_bucket_name}/mlflow-artifacts
 AWS_DEFAULT_REGION=${aws_region}
 EOF
@@ -54,8 +57,8 @@ ExecStart=/usr/local/bin/mlflow server \
     --workers 2
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/mlflow/logs/mlflow.log
-StandardError=append:/home/mlflow/logs/mlflow.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -87,13 +90,26 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << EOF
 }
 EOF
 
-# Wait for RDS to be ready
+# Wait for RDS to be ready with timeout
 echo "Waiting for database to be ready..."
-until nc -z ${db_endpoint} ${db_port}; do
-    echo "Database not ready yet, waiting..."
-    sleep 10
+db_host=$(echo ${db_endpoint} | cut -d: -f1)
+max_attempts=30
+attempt=1
+
+while [ $attempt -le $max_attempts ]; do
+    if nc -z $db_host ${db_port}; then
+        echo "Database is ready!"
+        break
+    else
+        echo "Database not ready yet, waiting... (attempt $attempt/$max_attempts)"
+        if [ $attempt -eq $max_attempts ]; then
+            echo "ERROR: Database did not become ready after $max_attempts attempts"
+            exit 1
+        fi
+        sleep 10
+        ((attempt++))
+    fi
 done
-echo "Database is ready!"
 
 # Test database connection and create tables
 python3 << EOF
@@ -108,7 +124,7 @@ while retry_count < max_retries:
     try:
         # Connect to MySQL
         connection = mysql.connector.connect(
-            host='${db_endpoint}',
+            host='${db_endpoint}'.split(':')[0],
             port=${db_port},
             user='${db_username}',
             password='${db_password}',
@@ -129,10 +145,6 @@ while retry_count < max_retries:
             print("Failed to connect to database after all retries")
             sys.exit(1)
 EOF
-
-# Initialize MLflow database
-cd /opt/mlflow
-sudo -u mlflow bash -c "source /opt/mlflow/mlflow.env && /usr/local/bin/mlflow db upgrade \$MLFLOW_BACKEND_STORE_URI"
 
 # Start and enable services
 systemctl daemon-reload
@@ -187,5 +199,6 @@ if systemctl is-active --quiet mlflow; then
 else
     echo "MLflow service failed to start"
     systemctl status mlflow
+    journalctl -u mlflow -n 20
     exit 1
 fi 

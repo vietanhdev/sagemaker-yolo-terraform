@@ -18,6 +18,21 @@ output "mlflow_ui_url" {
   value       = "http://${aws_instance.mlflow_server.public_ip}:5000"
 }
 
+output "key_pair_name" {
+  description = "Name of the created key pair"
+  value       = aws_key_pair.mlflow_key.key_name
+}
+
+output "private_key_file" {
+  description = "Path to the private key file"
+  value       = local_file.private_key.filename
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the MLflow server"
+  value       = "ssh -i ${local_file.private_key.filename} ec2-user@${aws_instance.mlflow_server.public_ip}"
+}
+
 output "rds_endpoint" {
   description = "RDS instance endpoint"
   value       = aws_db_instance.mlflow_db.endpoint
