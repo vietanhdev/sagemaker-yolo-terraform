@@ -1,0 +1,4 @@
+# Requirements for SageMaker Studio YOLO Training Script
+sagemaker>=2.189.0
+PyYAML>=6.0
+boto3>=1.28.0 

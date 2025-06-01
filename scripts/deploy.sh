@@ -313,6 +313,7 @@ EOF
         cat >> ../deployment_info.txt << EOF
 # Custom Mode Configuration
 MLFLOW_UI_URL=$(terraform output -raw mlflow_ui_url)
+CUSTOM_SAGEMAKER_EXECUTION_ROLE=$(terraform output -raw custom_sagemaker_execution_role_arn)
 EC2_PUBLIC_IP=$(terraform output -raw mlflow_server_public_ip)
 EC2_PRIVATE_IP=$(terraform output -raw mlflow_server_private_ip)
 RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
@@ -323,7 +324,8 @@ SSH_COMMAND="ssh -i $KEY_PAIR_NAME.pem ec2-user@$(terraform output -raw mlflow_s
 # 2. SSH to server using SSH_COMMAND
 # 3. Use MLFLOW_UI_URL as the MLflow tracking URI
 # 4. Upload datasets to S3_BUCKET
-# 5. Database credentials are stored in AWS Secrets Manager
+# 5. Use CUSTOM_SAGEMAKER_EXECUTION_ROLE for SageMaker training jobs
+# 6. Database credentials are stored in AWS Secrets Manager
 EOF
     fi
     

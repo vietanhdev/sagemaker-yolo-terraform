@@ -1,0 +1,34 @@
+# SageMaker Studio YOLO Training Configuration
+# This file contains all the configurable parameters for training in studio mode
+
+# Model Configuration
+model:
+  size: "yolo11s"                    # YOLO model size (yolo11n, yolo11s, yolo11m, yolo11l, yolo11x)
+  epochs: 25                         # Number of training epochs
+  batch_size: 16                     # Training batch size
+  image_size: 640                    # Input image size
+
+# Training Infrastructure
+sagemaker:
+  instance_type: "ml.g4dn.xlarge"    # SageMaker instance type for training
+  instance_count: 1                  # Number of instances
+  max_run_hours: 4                   # Maximum runtime in hours
+  use_spot_instances: true           # Use spot instances for cost savings
+  framework_version: "2.0"           # PyTorch version
+  python_version: "py310"            # Python version
+
+# Data Configuration
+data:
+  dataset_name: "beverages"          # Dataset name (will be used in S3 path)
+  data_yaml_filename: "data.yaml"    # YAML file name in the dataset
+
+# Experiment Configuration
+experiment:
+  name: "studio-yolo-training"       # MLflow experiment name
+  run_name_prefix: "yolo"           # Prefix for MLflow run names
+
+# Optional Overrides (leave empty to use values from deployment_info.txt)
+overrides:
+  s3_bucket: ""                      # Override S3 bucket (leave empty to use from deployment_info.txt)
+  execution_role: ""                 # Override execution role (leave empty to use from deployment_info.txt)
+  mlflow_uri: ""                     # Override MLflow URI (leave empty to use from deployment_info.txt) 

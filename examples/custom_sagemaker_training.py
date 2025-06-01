@@ -1,50 +1,28 @@
-# Works with both deployment modes
-from sagemaker.pytorch import PyTorch
+#!/usr/bin/env python3
+"""
+SageMaker Custom YOLO Training Script
+Reads configuration from files instead of hardcoding values.
+Designed for custom deployment mode (EC2-based MLflow with RDS).
+"""
 
-# Get the appropriate role from terraform outputs
-# For Studio mode:
-# role_arn = "arn:aws:iam::123456789012:role/your-studio-execution-role"  # From: terraform output studio_execution_role_arn
-# For Custom mode:
-# role_arn = "arn:aws:iam::123456789012:role/your-sagemaker-execution-role"  # From: terraform output custom_sagemaker_execution_role_arn
-role_arn = "arn:aws:iam::083919001538:role/yolo-mlflow-sagemaker-execution-role-7zj6tv75"  # From terraform output custom_sagemaker_execution_role_arn
+import sys
+from utils import run_training
 
-estimator = PyTorch(
-    entry_point="yolo_training.py",
-    source_dir="./scripts",  # Path to your training scripts
-    role=role_arn,
-    instance_type="ml.g4dn.xlarge",  # GPU instance - trying on-demand instead of spot
-    # Alternative instance types if quota issues persist:
-    # instance_type="ml.g5.xlarge",    # Newer GPU, 24GB VRAM
-    # instance_type="ml.g4dn.2xlarge", # Larger GPU, 32GB VRAM  
-    # instance_type="ml.m5.large",     # CPU fallback option
-    instance_count=1,
-    framework_version="2.0",
-    py_version="py310",
-    environment={
-        "MLFLOW_TRACKING_URI": "http://107.21.1.121:5000"
-    },
-    hyperparameters={
-        'mlflow-uri': 'http://107.21.1.121:5000',
-        'data-path': 's3://yolo-mlflow-artifacts-7zj6tv75/datasets/beverages/data.yaml',
-        's3-bucket': 'yolo-mlflow-artifacts-7zj6tv75',
-        's3-dataset-key': 'datasets/beverages/',
-        'model-size': 'yolo11s',
-        'epochs': 25,
-        'batch-size': 16,
-        'imgsz': 640,
-        'experiment-name': 'custom-yolo-gpu-training'
-    },
-    max_run=4*60*60,  # 4 hours timeout
-    use_spot_instances=True 
-)
 
-print("🚀 Starting SageMaker training job...")
-print(f"   Using role: {role_arn}")
-print(f"   Instance type: ml.g4dn.xlarge (GPU)")
-print(f"   Model: yolo11s (standard - GPU training)")
-print(f"   Epochs: 25 (moderate GPU training)")
-print(f"   MLflow URI: http://107.21.1.121:5000")
-print(f"   Training data: s3://yolo-mlflow-artifacts-7zj6tv75/datasets/beverages/")
-print("   Note: Using on-demand GPU instance instead of spot to avoid quota limits.")
+def main():
+    """Main training function for custom mode."""
+    try:
+        # Use the shared training function with custom configuration
+        estimator = run_training(
+            config_file="config_custom.yaml",
+            deployment_mode="custom",
+            script_name="custom"
+        )
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
 
-estimator.fit("s3://yolo-mlflow-artifacts-7zj6tv75/datasets/beverages/")
+
+if __name__ == "__main__":
+    main()
